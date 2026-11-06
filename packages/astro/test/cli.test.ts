@@ -6,6 +6,8 @@ import { Writable } from 'node:stream';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { stripVTControlCharacters } from 'node:util';
+import type { AstroLogger } from '../src/core/logger/core.js';
+import { getPackage } from '../src/cli/install-package.ts';
 import { cli, loadFixture, type Fixture } from './test-utils.ts';
 
 describe('astro cli', () => {
@@ -71,6 +73,25 @@ describe('astro cli', () => {
 		const result = await cli('--version').getResult();
 
 		assert.equal(result.stdout.includes(pkgVersion), true);
+	});
+
+	it('getPackage preserves initialization errors from installed packages', async () => {
+		const root = await fs.mkdtemp(join(tmpdir(), 'astro-check-import-'));
+		const moduleDir = join(root, 'node_modules', 'broken-check');
+		try {
+			await fs.mkdir(moduleDir, { recursive: true });
+			await fs.writeFile(
+				join(moduleDir, 'package.json'),
+				JSON.stringify({ type: 'module', main: 'index.js' }),
+			);
+			await fs.writeFile(join(moduleDir, 'index.js'), 'throw new Error("module failed to load")');
+			await assert.rejects(
+				getPackage('broken-check', { info() {} } as AstroLogger, { cwd: root, optional: true }),
+				/module failed to load/,
+			);
+		} finally {
+			await fs.rm(root, { recursive: true, force: true });
+		}
 	});
 
 	it('astro check no errors', {
