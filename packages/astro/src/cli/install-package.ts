@@ -36,12 +36,11 @@ export async function getPackage<T>(
 	options: GetPackageOptions,
 	otherDeps: string[] = [],
 ): Promise<T | undefined> {
+	let resolved: string;
 	try {
 		// Try to resolve with `createRequire` first to prevent ESM caching of the package
 		// if it errors and fails here
-		const resolved = require.resolve(packageName, { paths: [options.cwd ?? process.cwd()] });
-		const packageImport = await import(pathToFileURL(resolved).href);
-		return packageImport as T;
+		resolved = require.resolve(packageName, { paths: [options.cwd ?? process.cwd()] });
 	} catch {
 		if (options.optional) return undefined;
 		let message = `To continue, Astro requires the following dependency to be installed: ${bold(
@@ -68,6 +67,7 @@ export async function getPackage<T>(
 			return undefined;
 		}
 	}
+	return (await import(pathToFileURL(resolved).href)) as T;
 }
 
 async function installPackage(
